@@ -1,0 +1,11 @@
+# specify path to interpritator
+
+#!/bin/bash
+echo "Are you hungry?"
+read VALUE
+if [ $VALUE = "YES" ];
+then 
+echo "eat something"
+else
+echo "say YES"
+fi

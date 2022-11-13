@@ -1,0 +1,79 @@
+#!: /bin/bash
+# script for deploy flask/gunicorn/nginx/mysql
+
+# upgrade repo & install soft
+apt update
+apt install -y nginx python3 python3-pip python3-virtualenv curl
+
+# create project environment
+
+git clone https://github.com/BohdanBykov/aiblogger.git /srv/aiblogger/
+
+cd srv/aiblogger
+virtualenv env
+source env/bin/activate
+
+pip install -r requiremenst.txt
+
+cat > instance/config.py
+
+# create service for gunicorn
+sudo nano /etc/systemd/system/gunicorn.socket
+
+[Unit]
+Description=gunicorn socket
+
+[Socket]
+ListenStream=/run/gunicorn.sock
+
+[Install]
+WantedBy=sockets.target
+
+sudo nano /etc/systemd/system/gunicorn.service
+
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+User=bohdan
+Group=bohdan
+WorkingDirectory=/srv/aiblogger
+ExecStart=/srv/aiblogger/env/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/nginx.sock \
+          wsgi:app
+
+[Install]
+WantedBy=multi-user.target
+
+file /run/gunicorn.sock
+
+curl --unix.socket /run/gunicorn.sock localhost
+
+# set up nginx
+sudo nano /etc/nginx/nginx.conf
+
+events {
+    worker_connections 1024;
+}
+
+http {
+
+    server{
+
+	listen      80;
+        server_name localhost;
+
+        access_log /var/log/nginx/access.log;
+        error_log  /var/log/nginx/error.log;
+
+        location / {
+		include proxy_params;
+		proxy_pass http://unix:/run/gunicorn.sock;
+        }
+    }
+}
+
